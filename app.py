@@ -8,6 +8,17 @@ from enum import Enum
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import StreamingResponse
 
+# 1. ADD THIS CRITICAL IMPORT RIGHT HERE
+import cv2
+
+# 2. Keep the cvlib NumPy compatibility patch
+if not hasattr(np, 'int'):
+    np.int = int
+
+import cvlib as cv
+from cvlib.object_detection import draw_bbox
+
+
 # Assign an instance of the FastAPI class to the variable "app".
 # You will interact with your api using this instance.
 app = FastAPI(title='Deploying an ML Model with FastAPI')
