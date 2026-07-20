@@ -1,0 +1,6 @@
+io
+os
+uvicorn
+numpyasnp
+nest_asyncio
+subprocess
