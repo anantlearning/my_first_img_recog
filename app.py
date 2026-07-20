@@ -43,54 +43,48 @@ def home():
 # It requires the desired model and the image in which to perform object detection.
 @app.post("/predict")
 def prediction(model: Model, file: UploadFile = File(...)):
-    # 1. VALIDATE INPUT FILE
+    print(f"[DEBUG] Received file: {file.filename} using model: {model}", flush=True)
+
     filename = file.filename
-    fileExtension = filename.split(".")[-1] in ("jpg", "jpeg", "png")
-    if not fileExtension:
+    if not filename.lower().endswith((".jpg", ".jpeg", ".png")):
         raise HTTPException(status_code=415, detail="Unsupported file provided.")
 
     try:
-        # 2. TRANSFORM RAW IMAGE INTO CV2 image
+        # 1. READ ALL BYTES SECURELY
+        file_bytes = file.file.read()
+        if not file_bytes:
+            print("[ERROR] File payload came back completely empty.", flush=True)
+            raise HTTPException(status_code=400, detail="Uploaded file is empty.")
 
-        # Read image as a stream of bytes
-        image_stream = io.BytesIO(file.file.read())
+        # 2. DECODE BYTES INTO OPEN_CV IMAGE MATRIX
+        nparr = np.frombuffer(file_bytes, np.uint8)
+        image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
-        # Start the stream from the beginning (position zero)
-        image_stream.seek(0)
+        # 3. SAFETY GUARD: If image matrix fails to decode, stop here before cvlib runs
+        if image is None or image.size == 0:
+            print("[ERROR] OpenCV could not read or decode image pixels.", flush=True)
+            raise HTTPException(status_code=400, detail="Invalid image formatting or corrupted file.")
 
-        # Write the stream of bytes into a numpy array
-        file_bytes = np.asarray(bytearray(image_stream.read()), dtype=np.uint8)
+        print(f"[DEBUG] Image verified. Shape matches: {image.shape}", flush=True)
 
-        # Decode the numpy array as an image
-        image = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
-
-        if image is None:
-            raise ValueError("Could not decode the uploaded image.")
-
-        print(f"[DEBUG] Image decoded successfully. Shape: {image.shape}", flush=True)
-
-        # 3. RUN OBJECT DETECTION MODEL
-
-        # Run object detection
-        print("[DEBUG] Initiating object detection...", flush=True)
+        # 4. RUN OBJECT DETECTION SAFELY
+        print(f"[DEBUG] Passing verified matrix to cv.detect_common_objects...", flush=True)
         bbox, label, conf = cv.detect_common_objects(image, model=model)
+        print(f"[DEBUG] Detection complete! Objects found: {label}", flush=True)
 
-        # Create image that includes bounding boxes and labels
+        # 5. DRAW BOUNDARIES AND PROCESS RESPONSE
         output_image = draw_bbox(image, bbox, label, conf)
-        print(f"[DEBUG] Detection finished! Found labels: {label}", flush=True)
-        
-        # Save it in a folder within the server
-        cv2.imwrite(f'images_uploaded/{filename}', output_image)
+        output_path = f'images_uploaded/{filename}'
+        cv2.imwrite(output_path, output_image)
 
-        # 4. STREAM THE RESPONSE BACK TO THE CLIENT
-
-        # Open the saved image for reading in binary mode
-        file_image = open(f'images_uploaded/{filename}', mode="rb")
-
-        # Return the image as a stream specifying media type
+        # Open and return the modified image binary back to your browser/client
+        file_image = open(output_path, mode="rb")
         return StreamingResponse(file_image, media_type="image/jpeg")
 
+    except HTTPException as http_ex:
+        # Pass user validation errors straight back out
+        raise http_ex
     except Exception as e:
-        # If anything crashes, catch it and return the real reason instead of a blind 500 error
-        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
+        print(f"[CRITICAL FAILURE] Pipeline crashed on line: {str(e)}", flush=True)
+        raise HTTPException(status_code=500, detail=f"Internal Server Error on Processing: {str(e)}")
 
