@@ -3,3 +3,6 @@ uvicorn
 numpy
 nest_asyncio
 python-multipart
+opencv-python-headless
+cvlib
+tensorflow

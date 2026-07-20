@@ -12,6 +12,9 @@ from fastapi.responses import StreamingResponse
 # You will interact with your api using this instance.
 app = FastAPI(title='Deploying an ML Model with FastAPI')
 
+# Ensure the upload directory exists so Render does not crash
+os.makedirs("images_uploaded", exist_ok=True)
+
 
 # List available models using Enum for convenience. This is useful when the options are pre-defined.
 class Model(str, Enum):
