@@ -1,6 +1,5 @@
-io
-os
+fastapi
 uvicorn
-numpyasnp
+numpy
 nest_asyncio
-subprocess
+python-multipart
