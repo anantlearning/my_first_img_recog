@@ -67,14 +67,18 @@ def prediction(model: Model, file: UploadFile = File(...)):
         if image is None:
             raise ValueError("Could not decode the uploaded image.")
 
+        print(f"[DEBUG] Image decoded successfully. Shape: {image.shape}", flush=True)
+
         # 3. RUN OBJECT DETECTION MODEL
 
         # Run object detection
+        print("[DEBUG] Initiating object detection...", flush=True)
         bbox, label, conf = cv.detect_common_objects(image, model=model)
 
         # Create image that includes bounding boxes and labels
         output_image = draw_bbox(image, bbox, label, conf)
-
+        print(f"[DEBUG] Detection finished! Found labels: {label}", flush=True)
+        
         # Save it in a folder within the server
         cv2.imwrite(f'images_uploaded/{filename}', output_image)
 
