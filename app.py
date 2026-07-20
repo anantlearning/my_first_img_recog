@@ -49,37 +49,44 @@ def prediction(model: Model, file: UploadFile = File(...)):
     if not fileExtension:
         raise HTTPException(status_code=415, detail="Unsupported file provided.")
 
-    # 2. TRANSFORM RAW IMAGE INTO CV2 image
+    try:
+        # 2. TRANSFORM RAW IMAGE INTO CV2 image
 
-    # Read image as a stream of bytes
-    image_stream = io.BytesIO(file.file.read())
+        # Read image as a stream of bytes
+        image_stream = io.BytesIO(file.file.read())
 
-    # Start the stream from the beginning (position zero)
-    image_stream.seek(0)
+        # Start the stream from the beginning (position zero)
+        image_stream.seek(0)
 
-    # Write the stream of bytes into a numpy array
-    file_bytes = np.asarray(bytearray(image_stream.read()), dtype=np.uint8)
+        # Write the stream of bytes into a numpy array
+        file_bytes = np.asarray(bytearray(image_stream.read()), dtype=np.uint8)
 
-    # Decode the numpy array as an image
-    image = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+        # Decode the numpy array as an image
+        image = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
 
-    # 3. RUN OBJECT DETECTION MODEL
+        if image is None:
+            raise ValueError("Could not decode the uploaded image.")
 
-    # Run object detection
-    bbox, label, conf = cv.detect_common_objects(image, model=model)
+        # 3. RUN OBJECT DETECTION MODEL
 
-    # Create image that includes bounding boxes and labels
-    output_image = draw_bbox(image, bbox, label, conf)
+        # Run object detection
+        bbox, label, conf = cv.detect_common_objects(image, model=model)
 
-    # Save it in a folder within the server
-    cv2.imwrite(f'images_uploaded/{filename}', output_image)
+        # Create image that includes bounding boxes and labels
+        output_image = draw_bbox(image, bbox, label, conf)
 
-    # 4. STREAM THE RESPONSE BACK TO THE CLIENT
+        # Save it in a folder within the server
+        cv2.imwrite(f'images_uploaded/{filename}', output_image)
 
-    # Open the saved image for reading in binary mode
-    file_image = open(f'images_uploaded/{filename}', mode="rb")
+        # 4. STREAM THE RESPONSE BACK TO THE CLIENT
 
-    # Return the image as a stream specifying media type
-    return StreamingResponse(file_image, media_type="image/jpeg")
+        # Open the saved image for reading in binary mode
+        file_image = open(f'images_uploaded/{filename}', mode="rb")
 
+        # Return the image as a stream specifying media type
+        return StreamingResponse(file_image, media_type="image/jpeg")
+
+    except Exception as e:
+        # If anything crashes, catch it and return the real reason instead of a blind 500 error
+        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
 
